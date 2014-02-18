@@ -1,0 +1,14 @@
+    i18nextract: {
+      dev: {
+        src: [
+          '<%= yeoman.app %>/index.html',
+          '<%= yeoman.app %>/views/**/*.html',
+          '<%= yeoman.app %>/scripts/**/*.js'
+        ],
+        defaultLang: 'en',
+        lang: ['en', 'ru'],
+        suffix: '.json',
+        dest: '<%= yeoman.app %>/data/locale',
+        safeMode: true
+      }
+    },
