@@ -31,9 +31,11 @@ module.exports = function (grunt) {
       interpolation = this.data.interpolation || {startDelimiter: '{{', endDelimiter: '}}'},
       source = this.data.source || '',
       prefix = this.data.prefix || '',
-      // safeMode = this.data.safeMode ? true : false,
+      safeMode = this.data.safeMode ? true : false,
       suffix = this.data.suffix || '.json',
-      results = {};
+      results = {},
+      platJSON = {},
+      platTranslation = {};
 
     var escapeRegExp = function (str) {
       return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
@@ -225,42 +227,72 @@ module.exports = function (grunt) {
         translations = _.merge(translations, json);
       }
 
-      // TODO: find out how many translations have been added and removed
       // Make some stats
 
-      // for (var k in translations) {
-      //   var translation = translations[k];
-      //   var isJson = _.isString(json[k]);
-      //   var isResults = _.isString(results[k]);
+      var platObj = function (arr,obj,container) {
+        Object.getOwnPropertyNames(obj).forEach(function (proper) {
+          arr.push(proper);
 
-      //   nbTra++;
+          if (_.isObject(obj[proper])) {
+            platObj(arr,obj[proper],container);
+            arr.pop();
+          } else {
+            container[arr.join('.')] = obj[proper];
+            arr.pop();
+          }
+        });
+      };
 
-      //   // Case empty translation
-      //   if (translation === '') {
-      //     if (lang === defaultLang) {
-      //       translations[ k ] = k;
-      //     } else {
-      //       nbEmpty++;
-      //     }
-      //   }
-      //   // Case new translation (exist into src files but not in json file)
-      //   if (!isJson && isResults) {
-      //     nbNew++;
-      //   }
-      //   // Case deleted translation (exist in json file but not into src files)
-      //   if (isJson && !isResults) {
-      //     nbDel++;
-      //     if (!safeMode) {
-      //       delete translations[ k ];
-      //     }
-      //   }
-      // };
+      var deepDelete = function(target, context) {
+        // Assume global scope if none provided.
+        // Think about this
+        context = context || window;
+
+        var targets = target.split('.');
+
+        if (targets.length > 1) {
+          deepDelete(targets.slice(1).join('.'), context[targets[0]]);
+        } else {
+          delete context[target];
+        }
+      };
+
+      var arr = [];
+
+      platObj(arr,json,platJSON);
+      platObj(arr,translations,platTranslation);
+
+      for (var transProper in platTranslation) {
+        var proper = platTranslation[transProper];
+        var isJson = _.isString(platJSON[transProper]);
+        var isResults = _.isString(results[transProper]);
+        nbTra++;
+
+        safeMode = false;
+
+        // Case new translation (exist into src files but not in json file)
+        if (!isJson && isResults) {
+          nbNew++;
+        }
+        // Case deleted translation (exist in json file but not into src files)
+        if (isJson && !isResults) {
+          nbDel++;
+          if (!safeMode) {
+            deepDelete(transProper,translations);
+          }
+        }
+        if (proper === undefined || proper === '') {
+          // TODO defaultLang
+          nbEmpty++;
+        }
+      }
+
       // Some information for the output
       if (!_file.exists(destFilename)) {
         _log.subhead('Create file: ' + destFilename);
       }
 
-      //_log.writeln('Empty: ' + nbEmpty + ' (' + Math.round(nbEmpty / nbTra * 100) + '%) / New: ' + nbNew + ' / Deleted: ' + nbDel);
+      _log.writeln('Empty: ' + nbEmpty + ' (' + Math.round(nbEmpty / nbTra * 100) + '%) / New: ' + nbNew + ' / Deleted: ' + nbDel);
       // Write JSON file for lang
       _file.write(destFilename, JSON.stringify(translations, null, 2));
 
